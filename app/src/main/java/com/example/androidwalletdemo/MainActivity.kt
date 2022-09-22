@@ -1,76 +1,30 @@
 package com.example.androidwalletdemo
 
 import android.os.Bundle
-import com.google.android.material.snackbar.Snackbar
-import androidx.appcompat.app.AppCompatActivity
-import androidx.navigation.findNavController
-import androidx.navigation.ui.AppBarConfiguration
-import androidx.navigation.ui.navigateUp
-import androidx.navigation.ui.setupActionBarWithNavController
-import android.view.Menu
-import android.view.MenuItem
-import com.example.androidwalletdemo.databinding.ActivityMainBinding
-import org.stellar.kotlinwalletsdk.Wallet
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.androidwalletdemo.view.Main
+import com.example.androidwalletdemo.view.RecoverAccount
 
-class MainActivity : AppCompatActivity() {
+sealed class NavRoutes(val route: String) {
+  object Main : NavRoutes("main")
+  object RecoverAccount : NavRoutes("recoverAccount")
+}
 
-    private lateinit var appBarConfiguration: AppBarConfiguration
-    private lateinit var binding: ActivityMainBinding
+class MainActivity : ComponentActivity() {
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    setContent {
+      val navController = rememberNavController()
 
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
-        setSupportActionBar(binding.toolbar)
-
-        val navController = findNavController(R.id.nav_host_fragment_content_main)
-        appBarConfiguration = AppBarConfiguration(navController.graph)
-        setupActionBarWithNavController(navController, appBarConfiguration)
-// ================================================================================================
-//        Testing Kotlin Wallet SDK :: START
-
-        val wallet = Wallet(
-            "https://horizon-testnet.stellar.org",
-            "Test SDF Network ; September 2015"
-        )
-
-        fun createAccount() {
-            val newAccountKeypair = wallet.create()
-            println(newAccountKeypair)
-        }
-
-        binding.fab.setOnClickListener { view ->
-            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                .setAction("Action", null).show()
-
-            createAccount()
-        }
-
-//        Testing Kotlin Wallet SDK :: END
-// ================================================================================================
+      NavHost(navController = navController, startDestination = NavRoutes.Main.route) {
+        composable(NavRoutes.Main.route) { Main(navController) }
+        composable(NavRoutes.RecoverAccount.route) { RecoverAccount(navController) }
+      }
     }
-
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        menuInflater.inflate(R.menu.menu_main, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        return when (item.itemId) {
-            R.id.action_settings -> true
-            else -> super.onOptionsItemSelected(item)
-        }
-    }
-
-    override fun onSupportNavigateUp(): Boolean {
-        val navController = findNavController(R.id.nav_host_fragment_content_main)
-        return navController.navigateUp(appBarConfiguration)
-                || super.onSupportNavigateUp()
-    }
+  }
 }

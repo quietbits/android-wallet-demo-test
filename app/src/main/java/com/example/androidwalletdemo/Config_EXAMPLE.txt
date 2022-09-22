@@ -1,0 +1,33 @@
+package com.example.androidwalletdemo
+
+val rsConfig1 =
+    RecoveryServerFirebase(
+        "",
+        "",
+        "",
+        ""
+    )
+
+val rsConfig2 =
+    RecoveryServerFirebase(
+        "",
+        "",
+        "",
+        ""
+    )
+
+const val defaultPhoneNumber = ""
+const val defaultSmsCode = ""
+const val dbEndpoint = ""
+
+val recoveryServer1 =
+    RecoveryServer(
+        "",
+        ""
+    )
+
+val recoveryServer2 =
+    RecoveryServer(
+        "",
+        ""
+    )
