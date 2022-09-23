@@ -2,6 +2,7 @@ package com.example.androidwalletdemo.view
 
 import android.content.Context
 import android.content.Intent
+import android.util.Base64
 import android.util.Log
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -28,12 +29,9 @@ import com.example.androidwalletdemo.component.PageLayout
 import com.example.androidwalletdemo.component.TextWithLabel
 import com.example.androidwalletdemo.util.fetchStellarAddress
 import com.example.androidwalletdemo.util.shortenString
-import com.example.androidwalletdemo.util.signWithRecoveryServer
-import com.google.android.gms.common.util.Base64Utils
 import kotlinx.coroutines.launch
 import org.stellar.sdk.*
-import org.stellar.sdk.xdr.DecoratedSignature
-import org.stellar.sdk.xdr.Signature
+import org.stellar.walletsdk.RecoveryServerAuth
 import org.stellar.walletsdk.Wallet
 
 const val logTag = ">>> RecoverAccount"
@@ -44,14 +42,20 @@ const val networkPassphrase = "Test SDF Network ; September 2015"
 const val recoveryServer1Name = "recoveryServer1"
 const val recoveryServer2Name = "recoveryServer2"
 
+fun base64Decoder(baseString: String): ByteArray {
+  return Base64.decode(baseString, Base64.DEFAULT)
+}
+
 @Composable
 fun RecoverAccount(navController: NavHostController) {
   val context = LocalContext.current
   val screenScope = rememberCoroutineScope()
 
-  // Layout
   PageLayout("Recover account", navController) {
-    // State
+    // =============================================================================================
+    // VIEW STATE
+    // =============================================================================================
+
     val (inProgress, setInProgress) = remember { mutableStateOf(false) }
     val (txnSuccess, setTxnSuccess) = remember { mutableStateOf(false) }
     val (hasAuthTokens, setHasAuthTokens) = remember { mutableStateOf(false) }
@@ -63,18 +67,16 @@ fun RecoverAccount(navController: NavHostController) {
     val (newDevicePublicKey, setNewDevicePublicKey) = remember { mutableStateOf("") }
 
     val (txn, setTxn) = remember { mutableStateOf<Transaction?>(null) }
-    val (rs1Signature, setRs1Signature) = remember { mutableStateOf<String?>(null) }
-    val (rs2Signature, setRs2Signature) = remember { mutableStateOf<String?>(null) }
 
     val userPhoneNumberState = remember { mutableStateOf(TextFieldValue(defaultPhoneNumber)) }
     val userSmsCodeState = remember { mutableStateOf(TextFieldValue(defaultSmsCode)) }
 
-    // Init wallet
-    val wallet = Wallet(horizonUrl, networkPassphrase)
+    // =============================================================================================
+    // APP BACKEND
+    // =============================================================================================
+    // Get auth tokens from recovery servers and account Stellar address from DB
+    // =============================================================================================
 
-    // =============================================================
-    // Get auth token from recovery server 1 and 2, and account Stellar address
-    // =============================================================
     val rs1Intent =
       createRsIntent(
         context = context,
@@ -102,20 +104,28 @@ fun RecoverAccount(navController: NavHostController) {
       Log.d(logTag, "authToken1: $authToken1")
       Log.d(logTag, "authToken2: $authToken2")
 
-      // =============================================================
       // Get account Stellar address using RS1 auth token
-      // =============================================================
       LaunchedEffect(true) {
         screenScope.launch { setAccountStellarAddress(fetchStellarAddress(dbEndpoint, authToken1)) }
       }
     }
 
+    // =============================================================================================
+    // WALLET SDK: CREATE TRANSACTION
+    // =============================================================================================
+    // *** Must be on the client
+    // Generate new device keypair, save secret key in KeyStore, create "Add signer" transaction
+    // This transaction can be sponsored
+    // Remove old signer operation can be added
+    // =============================================================================================
+
+    // Init wallet
+    val wallet = Wallet(horizonUrl, networkPassphrase)
+
     if (txn == null && accountStellarAddress.isNotBlank()) {
       Log.d(logTag, "accountStellarAddress: $accountStellarAddress")
 
-      // =============================================================
       // Generate new device keypair
-      // =============================================================
       val deviceKeypair = wallet.create()
       val devicePublicKey = deviceKeypair.publicKey
 
@@ -125,10 +135,7 @@ fun RecoverAccount(navController: NavHostController) {
       Log.d(logTag, "newDevicePublicKey: $devicePublicKey")
       Log.d(logTag, "newDeviceSecretKey: $deviceSecretKey")
 
-      // =============================================================
-      // New transaction to add new device key as signer with max weight
-      // NOTE: this transaction can be sponsored
-      // =============================================================
+      // New transaction to add new device key as a signer with max weight
       LaunchedEffect(true) {
         screenScope.launch {
           setTxn(
@@ -143,60 +150,51 @@ fun RecoverAccount(navController: NavHostController) {
       }
     }
 
-    // NOTE: sign transaction by sponsor if using sponsored transaction
-    // NOTE: add remove old device signer operation here if desired
+    // =============================================================================================
+    // WALLET SDK: RECOVERY SERVERS SIGN TRANSACTION
+    // =============================================================================================
+    // *** Must be on the client
+    // Each recovery server signs the transaction
+    // New device signer doesn't sign this transaction
+    // =============================================================================================
 
-    // =============================================================
-    // Sign by each recovery server
-    // NOTE: new device signer doesn't sign this transaction
-    // =============================================================
     if (txn != null && !hasRecoverySignatures) {
       LaunchedEffect(true) {
         screenScope.launch {
-          val sig1 =
-            signWithRecoveryServer(
-              rsEndpoint = recoveryServer1.endpoint,
+          setTxn(
+            wallet.signWithRecoveryServers(
               transaction = txn,
-              token = authToken1,
               accountAddress = accountStellarAddress,
-              signerAddress = recoveryServer1.stellarAddress
+              recoveryServers =
+                listOf(
+                  RecoveryServerAuth(
+                    endpoint = recoveryServer1.endpoint,
+                    signerAddress = recoveryServer1.stellarAddress,
+                    authToken = authToken1
+                  ),
+                  RecoveryServerAuth(
+                    endpoint = recoveryServer2.endpoint,
+                    signerAddress = recoveryServer2.stellarAddress,
+                    authToken = authToken2
+                  )
+                ),
+              base64Decoder = ::base64Decoder
             )
-
-          val sig2 =
-            signWithRecoveryServer(
-              rsEndpoint = recoveryServer2.endpoint,
-              transaction = txn,
-              token = authToken2,
-              accountAddress = accountStellarAddress,
-              signerAddress = recoveryServer2.stellarAddress
-            )
-
-          setRs1Signature(sig1)
-          setRs2Signature(sig2)
+          )
           setHasRecoverySignatures(true)
         }
       }
     }
 
+    // =============================================================================================
+    // WALLET SDK: SUBMIT TRANSACTION TO THE NETWORK
+    // =============================================================================================
+    // For sponsored transaction, sign the transaction and use fee bump to cover fees
+    // =============================================================================================
+
     if (hasRecoverySignatures && inProgress) {
-      Log.d(logTag, "rs1Signature: $rs1Signature")
-      Log.d(logTag, "rs2Signature: $rs2Signature")
+      Log.d(logTag, "signed txn: ${txn!!.toEnvelopeXdrBase64()}")
 
-      // =============================================================
-      // Add recovery server signatures to the transaction
-      // =============================================================
-      val sig1 = createDecoratedSignature(recoveryServer1.stellarAddress, rs1Signature!!)
-      val sig2 = createDecoratedSignature(recoveryServer2.stellarAddress, rs2Signature!!)
-
-      txn!!.addSignature(sig1)
-      txn.addSignature(sig2)
-
-      Log.d(logTag, "signed txn: ${txn.toEnvelopeXdrBase64()}")
-
-      // =============================================================
-      // Submit transaction to the network
-      // NOTE: for sponsored transaction, use fee bump here
-      // =============================================================
       LaunchedEffect(true) {
         screenScope.launch {
           val success = wallet.submitTransaction(txn)
@@ -208,7 +206,10 @@ fun RecoverAccount(navController: NavHostController) {
       }
     }
 
-    //  UI elements
+    // =============================================================================================
+    // UI ELEMENTS
+    // =============================================================================================
+
     Text(
       "Enter user's phone number and SMS code to start account recovery",
       modifier = Modifier.padding(bottom = 8.dp)
@@ -260,18 +261,6 @@ fun RecoverAccount(navController: NavHostController) {
       )
     }
   }
-}
-
-// TODO: move to Wallet SDK
-fun createDecoratedSignature(publicKey: String, signatureBase64String: String): DecoratedSignature {
-  val signature = Signature()
-  signature.signature = Base64Utils.decode(signatureBase64String)
-
-  val decoratedSig = DecoratedSignature()
-  decoratedSig.signature = signature
-  decoratedSig.hint = KeyPair.fromAccountId(publicKey).signatureHint
-
-  return decoratedSig
 }
 
 fun createRsIntent(
