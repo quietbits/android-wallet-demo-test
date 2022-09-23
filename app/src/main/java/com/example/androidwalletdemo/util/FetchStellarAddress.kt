@@ -1,6 +1,5 @@
 package com.example.androidwalletdemo.util
 
-import com.google.gson.Gson
 import java.io.IOException
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
@@ -9,8 +8,7 @@ import okhttp3.Request
 suspend fun fetchStellarAddress(endpoint: String, token: String): String {
   data class UserInfo(val stellarAddress: String)
 
-  // TODO: optimize gson
-  val gson = Gson()
+  val gson = GsonUtil.instance!!
   val client = OkHttpClient()
 
   return CoroutineScope(Dispatchers.IO)
