@@ -6,6 +6,8 @@ import com.example.androidwalletdemo.NavRoutes
 import com.example.androidwalletdemo.component.ActionButton
 import com.example.androidwalletdemo.component.PageLayout
 
+const val baseFee = 500
+
 @Composable
 fun Main(navController: NavHostController) {
   PageLayout("Stellar Wallet SDK Demo", navController) {

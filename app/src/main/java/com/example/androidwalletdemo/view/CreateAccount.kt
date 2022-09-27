@@ -21,10 +21,11 @@ import kotlinx.coroutines.launch
 import org.stellar.sdk.*
 import org.stellar.walletsdk.Wallet
 import org.stellar.walletsdk.util.buildTransaction
+import org.stellar.walletsdk.util.fetchAccount
 
 // TODO: remove
-private val server = Server(horizonUrl)
-private val network = Network(networkPassphrase)
+private val server = Server("https://horizon-testnet.stellar.org")
+private val network = Network("Test SDF Network ; September 2015")
 
 const val signerMasterWeight = 20
 const val signerRecoveryWeight = 10
@@ -97,43 +98,23 @@ fun CreateAccount(navController: NavHostController) {
 
           if (isFunded) {
             Log.d(logTag, "Friendbot funded account")
-            setIsAccountFunded(true)
+            //            setIsAccountFunded(true)
+
+            testStellarStuff(
+              wallet = wallet,
+              accountPublicKey,
+              accountSecretKey,
+              devicePublicKey,
+              deviceSecretKey
+            )
+
+            Log.d(logTag, "testTxn created")
           } else {
             throw Exception("Account was not funded")
           }
         }
       }
     }
-
-    //    TODO: set weights for RS signers (10 each) and device key (20)
-
-    if (inProgress && isAccountFunded) {
-      LaunchedEffect(true) {
-        screenScope.launch {
-          txn =
-            addAccountSignerTest(
-              sourceAddress = accountPublicKey,
-              signer =
-                arrayOf(
-                  AccountSigner(
-                    address = recoveryServer1.stellarAddress,
-                    weight = signerRecoveryWeight
-                  ),
-                  AccountSigner(
-                    address = recoveryServer2.stellarAddress,
-                    weight = signerRecoveryWeight
-                  ),
-                  AccountSigner(address = devicePublicKey, weight = signerMasterWeight)
-                )
-            )
-        }
-      }
-    }
-
-    //   TODO: set weights for thresholds (all 20)
-    //    TODO: sign with master key
-
-    //    TODO: once RS is set, lock master key (set weight to 0)
 
     // =============================================================================================
     // UI ELEMENTS
@@ -165,31 +146,110 @@ fun CreateAccount(navController: NavHostController) {
   }
 }
 
+suspend fun testStellarStuff(
+  wallet: Wallet,
+  accountPublicKey: String,
+  accountSecretKey: String,
+  devicePublicKey: String,
+  deviceSecretKey: String
+) {
+  val testTxn =
+    createTransactionBuilder(
+      sourceAddress = accountPublicKey,
+      server = server,
+      network = network,
+    )
+
+  //    TODO: set weights for RS signers (10 each) and device key (20)
+  testTxn.addOperations(
+    listOf(
+      addSignerOperation(
+        AccountSigner(address = recoveryServer1.stellarAddress, weight = signerRecoveryWeight)
+      ),
+      addSignerOperation(
+        AccountSigner(address = recoveryServer2.stellarAddress, weight = signerRecoveryWeight)
+      ),
+      addSignerOperation(AccountSigner(address = devicePublicKey, weight = signerMasterWeight))
+    )
+  )
+
+  //    TODO: set weights for thresholds (all 20)
+  testTxn.addOperation(
+    setThresholdsOperation(
+      low = signerMasterWeight,
+      medium = signerMasterWeight,
+      high = signerMasterWeight
+    )
+  )
+
+  val txn = testTxn.build()
+
+  Log.d(logTag, "Transaction: ${txn.toEnvelopeXdrBase64()}")
+
+  //    TODO: sign with master key
+  txn.sign(KeyPair.fromSecretSeed(accountSecretKey))
+
+  val success = wallet.submitTransaction(txn)
+
+  if (success) {
+    Log.d(logTag, "Transaction submitted successfully")
+
+    //    TODO: once RS is set, lock master key (set weight to 0)
+    val newTxn =
+      createTransactionBuilder(sourceAddress = accountPublicKey, server = server, network = network)
+
+    newTxn.addOperation(lockMasterKey())
+    val lockTxn = newTxn.build()
+    //    TODO: sign with device key
+    lockTxn.sign(KeyPair.fromSecretSeed(deviceSecretKey))
+
+    val lockSuccess = wallet.submitTransaction(lockTxn)
+
+    if (lockSuccess) {
+      Log.d(logTag, "Account master key locked")
+    } else {
+      throw Exception("Master key lock failed")
+    }
+  }
+}
+
 data class AccountSigner(val address: String, val weight: Int)
 
-suspend fun addAccountSignerTest(
+fun addSignerOperation(signer: AccountSigner): SetOptionsOperation {
+  val signerKeypair = KeyPair.fromAccountId(signer.address)
+  val signerKey = Signer.ed25519PublicKey(signerKeypair)
+
+  return SetOptionsOperation.Builder().setSigner(signerKey, signer.weight).build()
+}
+
+// TODO: build transaction with multiple operations
+suspend fun createTransactionBuilder(
   sourceAddress: String,
-  signer: Array<AccountSigner>,
-  sponsorAddress: String = ""
-): Transaction {
-  //  val isSponsored = sponsorAddress.isNotBlank()
+  server: Server,
+  network: Network,
+): TransactionBuilder {
+  val sourceAccount = fetchAccount(sourceAddress, server)
 
-  val addSignerOps =
-    signer.map { s ->
-      val signerKeypair = KeyPair.fromAccountId(s.address)
-      val signerKey = Signer.ed25519PublicKey(signerKeypair)
+  // TODO: add memo
+  // TODO: update max fee
+  // TODO: add time bounds
+  // TODO: custom base fee
 
-      SetOptionsOperation.Builder().setSigner(signerKey, s.weight).build() as SetOptionsOperation
-    }
+  return Transaction.Builder(sourceAccount, network).setBaseFee(500).setTimeout(180)
+}
 
-  //  val operations: List<Operation> =
-  //    if (isSponsored) {
-  //      sponsorOperation(sponsorAddress, sourceAddress, addSignerOps)
-  //    } else {
-  //      addSignerOps
-  //    }
+fun setThresholdsOperation(low: Int, medium: Int, high: Int): SetOptionsOperation {
+  return SetOptionsOperation.Builder()
+    .setLowThreshold(low)
+    .setMediumThreshold(medium)
+    .setHighThreshold(high)
+    .build()
+}
 
-  val operations: List<Operation> = addSignerOps
+fun setMasterKeyWeight(weight: Int): SetOptionsOperation {
+  return SetOptionsOperation.Builder().setMasterKeyWeight(weight).build()
+}
 
-  return buildTransaction(sourceAddress, server, network, operations)
+fun lockMasterKey(): SetOptionsOperation {
+  return setMasterKeyWeight(0)
 }
