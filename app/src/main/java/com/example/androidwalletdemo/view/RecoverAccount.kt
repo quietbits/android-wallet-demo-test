@@ -178,6 +178,7 @@ fun RecoverAccount(navController: NavHostController) {
                     authToken = authToken2
                   )
                 ),
+              // Custom decoder is needed to support Android API 21. It's not needed for API 23+.
               base64Decoder = ::base64Decoder
             )
           )
