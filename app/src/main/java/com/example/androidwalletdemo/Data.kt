@@ -6,8 +6,3 @@ data class RecoveryServerFirebase(
     val appId: String,
     val apiKey: String
 )
-
-data class RecoveryServer(
-    val endpoint: String,
-    val stellarAddress: String,
-)

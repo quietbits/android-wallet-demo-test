@@ -27,16 +27,30 @@ object OkHttpUtil {
     return request.build()
   }
 
-  fun <T> buildJsonPostRequest(url: String, requestParams: T, authToken: String? = null): Request {
+  fun <T> buildJsonPostRequest(url: String, requestParams: T, authToken: String? = null):
+          Request {
     val request = Request.Builder().url(url).header("Content-Type", jsonContentType)
 
     if (authToken != null) {
       request.addHeader("Authorization", "Bearer $authToken")
     }
 
-    return request.post(gson.toJson(requestParams).toRequestBody(jsonContentMediaType)).build()
+    val params = gson.toJson(requestParams).toRequestBody(jsonContentMediaType)
+
+    return request.post(params).build()
   }
 
+  fun <T> buildJsonPutRequest(url: String, requestParams: T, authToken: String? = null): Request {
+    val request = Request.Builder().url(url).header("Content-Type", jsonContentType)
+
+    if (authToken != null) {
+      request.addHeader("Authorization", "Bearer $authToken")
+    }
+
+    return request.put(gson.toJson(requestParams).toRequestBody(jsonContentMediaType)).build()
+  }
+
+  //  Ignore certificates when testing
   private val trustAllCerts: Array<TrustManager> =
     arrayOf(
       @SuppressLint("CustomX509TrustManager")

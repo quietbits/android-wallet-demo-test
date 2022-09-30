@@ -9,6 +9,25 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun TextWithLabel(label: String, text: String) {
-    Text(label, fontWeight = FontWeight.Bold)
-    Text(text.ifEmpty { "..." }, modifier = Modifier.padding(bottom = 8.dp))
+  Text(label, fontWeight = FontWeight.Bold)
+  Text(text.ifEmpty { "..." }, modifier = Modifier.padding(bottom = 8.dp))
+}
+
+@Composable
+fun TextListWithLabel(label: String, text: List<String>) {
+  Text(label, fontWeight = FontWeight.Bold)
+  text.forEachIndexed { index, s ->
+    Text(
+      s.ifEmpty { "..." },
+      modifier =
+        Modifier.padding(
+          bottom =
+            if (index == text.size - 1) {
+              8.dp
+            } else {
+              0.dp
+            }
+        )
+    )
+  }
 }

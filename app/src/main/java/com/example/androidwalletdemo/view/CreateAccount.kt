@@ -4,37 +4,35 @@ import android.util.Log
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Button
+import androidx.compose.material.LinearProgressIndicator
 import androidx.compose.material.Text
 import androidx.compose.material.TextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.example.androidwalletdemo.*
 import com.example.androidwalletdemo.component.PageLayout
-import com.example.androidwalletdemo.defaultPhoneNumber
-import com.example.androidwalletdemo.defaultSmsCode
-import com.example.androidwalletdemo.recoveryServer1
-import com.example.androidwalletdemo.recoveryServer2
+import com.example.androidwalletdemo.component.SuccessMessage
+import com.example.androidwalletdemo.component.TextListWithLabel
+import com.example.androidwalletdemo.component.TextWithLabel
+import com.example.androidwalletdemo.util.fundWithFriendbot
+import com.example.androidwalletdemo.util.shortenString
 import kotlinx.coroutines.launch
-import org.stellar.sdk.*
-import org.stellar.walletsdk.Wallet
-import org.stellar.walletsdk.util.buildTransaction
-import org.stellar.walletsdk.util.fetchAccount
+import org.stellar.walletsdk.*
 
-// TODO: remove
-private val server = Server("https://horizon-testnet.stellar.org")
-private val network = Network("Test SDF Network ; September 2015")
+const val logTagCreateAccount = ">>> CreateAccount"
 
-const val signerMasterWeight = 20
-const val signerRecoveryWeight = 10
+data class RecoverableWallet(
+  val address: String,
+  val threshold: AccountThreshold,
+  val signer: List<AccountSigner>,
+  val identity: List<RecoveryAccountIdentity>,
+)
 
 @Composable
 fun CreateAccount(navController: NavHostController) {
-  val logTag = ">>> CreateAccount"
-
-  val context = LocalContext.current
   val screenScope = rememberCoroutineScope()
 
   PageLayout("Create account", navController) {
@@ -43,72 +41,164 @@ fun CreateAccount(navController: NavHostController) {
     // =============================================================================================
 
     val (inProgress, setInProgress) = remember { mutableStateOf(false) }
-    val (isAccountFunded, setIsAccountFunded) = remember { mutableStateOf(false) }
-
-    val userPhoneNumberState = remember { mutableStateOf(TextFieldValue(defaultPhoneNumber)) }
-    val userSmsCodeState = remember { mutableStateOf(TextFieldValue(defaultSmsCode)) }
+    val userPhoneNumberState = remember { mutableStateOf(TextFieldValue(defaultPhoneNumberCreate)) }
+    val (recoverableWallet, setRecoverableWallet) =
+      remember { mutableStateOf<RecoverableWallet?>(null) }
 
     // =============================================================================================
-    // STELLAR OPERATIONS
+    // WALLET SDK: GENERATE ACCOUNT AND DEVICE KEYPAIRS
+    // =============================================================================================
+    // *** Must be on the client
+    // Generate new account and device keypairs, save secret keys in KeyStore
+    // Note: this demo doesn't show app backend/database side
     // =============================================================================================
 
     // Init wallet
-    val wallet = Wallet(horizonUrl, networkPassphrase)
+    val wallet = Wallet(horizonUrl, networkPassphrase, baseFee)
 
-    var accountPublicKey = ""
-    var accountSecretKey = ""
+    if (inProgress) {
+      // Generate new account keypair
+      val accountKeypair = wallet.create()
+      val accountPublicKey = accountKeypair.publicKey
+      //  Secret key should be stored in KeyStore, saving on the UI for demo only
+      val accountSecretKey = accountKeypair.secretKey
 
-    var devicePublicKey = ""
-    var deviceSecretKey = ""
+      // Generate new account keypair
+      val deviceKeypair = wallet.create()
+      val devicePublicKey = deviceKeypair.publicKey
+      //  Secret key should be stored in KeyStore, saving on the UI for demo only
+      val deviceSecretKey = deviceKeypair.secretKey
 
-    var txn: Transaction? = null
-
-    if (inProgress && !isAccountFunded) {
-
-      //    TODO: create account keypair
-      //    val accountKeypair = wallet.create()
-      //    val accountPublicKey = accountKeypair.publicKey
-      //    val accountSecretKey = accountKeypair.secretKey
-
-      accountPublicKey = "GA3UFW5QSQSDXMJTZI4WZ74UAKCEWYXS7HUUEUX77ILIAUYCY4U5VOAM"
-      accountSecretKey = "SBGFNKUHZ3PMPMJ4WWIJ7PIJ6ABEPFPV2V4YLLP66EL275UG4PRCQ7NV"
-
-      Log.d(logTag, "account public key: $accountPublicKey")
-      Log.d(logTag, "account secret key: $accountSecretKey")
-
-      //    TODO: create device keypair
-      //    val deviceKeypair = wallet.create()
-      //    val devicePublicKey = deviceKeypair.publicKey
-      //    val deviceSecretKey = deviceKeypair.secretKey
-
-      devicePublicKey = "GDXPUDJFEKSIUJEWXM6PM335BCNLVJ5E5GL7UVNOFYI7BM6MBST7LGS3"
-      deviceSecretKey = "SD5K3ZZHJPI65JHIOGRIUW7EC6TJFW3TDTDL23XE3SOPKX66PQL6EBP3"
-
-      Log.d(logTag, "device public key: $devicePublicKey")
-      Log.d(logTag, "device secret key: $deviceSecretKey")
-
-      //    TODO: txn to create account
-      //    TODO: fund account with friendbot
+      Log.d(logTagCreateAccount, "account public key: $accountPublicKey")
+      Log.d(logTagCreateAccount, "account secret key: $accountSecretKey")
+      Log.d(logTagCreateAccount, "device public key: $devicePublicKey")
+      Log.d(logTagCreateAccount, "device secret key: $deviceSecretKey")
 
       LaunchedEffect(true) {
         screenScope.launch {
-          //          TODO: put back
-          //          val isFunded = fundWithFriendbot(accountPublicKey)
-          val isFunded = true
+          // Fund account with friendbot (only on testnet) or sponsor create account operation
+          val isFunded = fundWithFriendbot(accountPublicKey)
 
           if (isFunded) {
-            Log.d(logTag, "Friendbot funded account")
-            //            setIsAccountFunded(true)
+            Log.d(logTagCreateAccount, "Friendbot funded account")
 
-            testStellarStuff(
-              wallet = wallet,
-              accountPublicKey,
-              accountSecretKey,
-              devicePublicKey,
-              deviceSecretKey
-            )
+            // =====================================================================================
+            // WALLET SDK: CREATE RECOVERABLE WALLET
+            // =====================================================================================
 
-            Log.d(logTag, "testTxn created")
+            // Account and device transaction signers
+            val accountWalletSigner = AppWalletSigner(accountSecretKey)
+            val deviceWalletSigner = AppWalletSigner(deviceSecretKey)
+
+            // This transaction can be sponsored
+            val newWalletTransaction =
+              wallet.createRecoverableWallet(
+                accountAddress = accountPublicKey,
+                deviceAddress = devicePublicKey,
+                // Account thresholds
+                accountThreshold =
+                  AccountThreshold(
+                    low = signerMasterWeight,
+                    medium = signerMasterWeight,
+                    high = signerMasterWeight
+                  ),
+                accountIdentity =
+                  // Account identity (can be multiple) to be registered with recovery server
+                  listOf(
+                    RecoveryAccountIdentity(
+                      // Role can be "owner", "sender", or "receiver"
+                      role = "owner",
+                      auth_methods =
+                        // Account auth methods (phone number, email, etc)
+                        listOf(
+                          RecoveryAccountAuthMethod(
+                            type = "phone_number",
+                            value = userPhoneNumberState.value.text
+                          )
+                        )
+                    )
+                  ),
+                // Recovery server information
+                recoveryServers = listOf(recoveryServer1, recoveryServer2),
+                accountWalletSigner = accountWalletSigner,
+                // Account signer weights
+                signerWeight =
+                  SignerWeight(master = signerMasterWeight, recoveryServer = signerRecoveryWeight)
+              )
+
+            // Sign transaction with account master key
+            val signedTxn = accountWalletSigner.signWithClientAccount(newWalletTransaction)
+            // If sponsored, sponsor signs transaction and creates fee bump transaction (can be
+            // done on the backend)
+
+            // Submit transaction to the network (can be done on the backend)
+            val txnSuccess = wallet.submitTransaction(signedTxn)
+
+            if (txnSuccess) {
+              Log.d(logTagCreateAccount, "New account created")
+
+              // Lock account master key using newly added device key (can be done later)
+              val lockTxn =
+                wallet.lockAccountMasterKey(
+                  accountAddress = accountPublicKey,
+                )
+
+              // Sign lock transaction with device secret key
+              val signedLockTxn = deviceWalletSigner.signWithClientAccount(lockTxn)
+              // If sponsored, sponsor signs transaction and creates fee bump transaction (can be
+              // done on the backend)
+
+              // Submit lock master key transaction to the network (can be done on the backend)
+              val lockTxnSuccess = wallet.submitTransaction(signedLockTxn)
+
+              if (lockTxnSuccess) {
+                Log.d(logTagCreateAccount, "Master key locked")
+              }
+            }
+
+            // =====================================================================================
+            // DATA FOR LOGS AND UI
+            // =====================================================================================
+
+            val resultData =
+              RecoverableWallet(
+                address = accountPublicKey,
+                threshold =
+                  AccountThreshold(
+                    low = signerMasterWeight,
+                    medium = signerMasterWeight,
+                    high = signerMasterWeight
+                  ),
+                signer =
+                  listOf(
+                    AccountSigner(address = devicePublicKey, weight = signerMasterWeight),
+                    AccountSigner(
+                      address = recoveryServer1.stellarAddress,
+                      weight = signerRecoveryWeight
+                    ),
+                    AccountSigner(
+                      address = recoveryServer2.stellarAddress,
+                      weight = signerRecoveryWeight
+                    )
+                  ),
+                identity =
+                  listOf(
+                    RecoveryAccountIdentity(
+                      role = "owner",
+                      auth_methods =
+                        listOf(
+                          RecoveryAccountAuthMethod(
+                            type = "phone_number",
+                            value = userPhoneNumberState.value.text
+                          )
+                        )
+                    )
+                  )
+              )
+
+            logResult(resultData)
+            setRecoverableWallet(resultData)
+            setInProgress(false)
           } else {
             throw Exception("Account was not funded")
           }
@@ -121,7 +211,7 @@ fun CreateAccount(navController: NavHostController) {
     // =============================================================================================
 
     Text(
-      "Enter user's phone number and SMS code to create account",
+      "Enter user's phone number to create a new account",
       modifier = Modifier.padding(bottom = 8.dp)
     )
     TextField(
@@ -130,126 +220,75 @@ fun CreateAccount(navController: NavHostController) {
       label = { Text("User phone number") },
       modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
     )
-    TextField(
-      value = userSmsCodeState.value,
-      onValueChange = { userSmsCodeState.value = it },
-      label = { Text("SMS code") },
-      modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-    )
 
-    Button(
-      onClick = { setInProgress(true) },
-      modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-    ) {
-      Text("Start")
+    if (!inProgress && recoverableWallet == null) {
+      Button(
+        onClick = { setInProgress(true) },
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+      ) {
+        Text("Start")
+      }
+    }
+
+    if (inProgress) {
+      LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp))
+    }
+
+    if (!inProgress && recoverableWallet != null) {
+      SuccessMessage(message = "New account created")
+
+      TextWithLabel(label = "Account address", text = shortenString(recoverableWallet.address))
+
+      recoverableWallet.identity.forEach { i ->
+        TextWithLabel(label = "Account role", text = i.role)
+
+        i.auth_methods.forEach { m ->
+          TextWithLabel(label = "Account auth method", text = "${m.type} : ${m.value}")
+        }
+      }
+
+      TextListWithLabel(
+        label = "Signers",
+        text = recoverableWallet.signer.map { s -> "${shortenString(s.address)} : ${s.weight}" }
+      )
+
+      val threshold = recoverableWallet.threshold
+
+      TextListWithLabel(
+        label = "Threshold",
+        text =
+          listOf("low : ${threshold.low}", "medium: ${threshold.medium}", "high: ${threshold.high}")
+      )
+
+      Text("Master key locked")
     }
   }
 }
 
-suspend fun testStellarStuff(
-  wallet: Wallet,
-  accountPublicKey: String,
-  accountSecretKey: String,
-  devicePublicKey: String,
-  deviceSecretKey: String
-) {
-  val testTxn =
-    createTransactionBuilder(
-      sourceAddress = accountPublicKey,
-      server = server,
-      network = network,
-    )
+// =================================================================================================
+// HELPERS
+// =================================================================================================
 
-  //    TODO: set weights for RS signers (10 each) and device key (20)
-  testTxn.addOperations(
-    listOf(
-      addSignerOperation(
-        AccountSigner(address = recoveryServer1.stellarAddress, weight = signerRecoveryWeight)
-      ),
-      addSignerOperation(
-        AccountSigner(address = recoveryServer2.stellarAddress, weight = signerRecoveryWeight)
-      ),
-      addSignerOperation(AccountSigner(address = devicePublicKey, weight = signerMasterWeight))
-    )
-  )
+fun logResult(recoverableWallet: RecoverableWallet) {
+  Log.d(logTagCreateAccount, "Recoverable wallet created")
+  Log.d(logTagCreateAccount, "Account address: ${recoverableWallet.address}")
 
-  //    TODO: set weights for thresholds (all 20)
-  testTxn.addOperation(
-    setThresholdsOperation(
-      low = signerMasterWeight,
-      medium = signerMasterWeight,
-      high = signerMasterWeight
-    )
-  )
+  Log.d(logTagCreateAccount, "Account identity:")
+  recoverableWallet.identity.forEach { i ->
+    Log.d(logTagCreateAccount, "  Account role: ${i.role}")
 
-  val txn = testTxn.build()
-
-  Log.d(logTag, "Transaction: ${txn.toEnvelopeXdrBase64()}")
-
-  //    TODO: sign with master key
-  txn.sign(KeyPair.fromSecretSeed(accountSecretKey))
-
-  val success = wallet.submitTransaction(txn)
-
-  if (success) {
-    Log.d(logTag, "Transaction submitted successfully")
-
-    //    TODO: once RS is set, lock master key (set weight to 0)
-    val newTxn =
-      createTransactionBuilder(sourceAddress = accountPublicKey, server = server, network = network)
-
-    newTxn.addOperation(lockMasterKey())
-    val lockTxn = newTxn.build()
-    //    TODO: sign with device key
-    lockTxn.sign(KeyPair.fromSecretSeed(deviceSecretKey))
-
-    val lockSuccess = wallet.submitTransaction(lockTxn)
-
-    if (lockSuccess) {
-      Log.d(logTag, "Account master key locked")
-    } else {
-      throw Exception("Master key lock failed")
+    i.auth_methods.forEach { m ->
+      Log.d(logTagCreateAccount, "  Account auth method: ${m.type} : ${m.value}")
     }
   }
-}
 
-data class AccountSigner(val address: String, val weight: Int)
+  Log.d(logTagCreateAccount, "Signers:")
+  recoverableWallet.signer.forEach { s ->
+    Log.d(logTagCreateAccount, "  ${s.address} : ${s.weight}")
+  }
 
-fun addSignerOperation(signer: AccountSigner): SetOptionsOperation {
-  val signerKeypair = KeyPair.fromAccountId(signer.address)
-  val signerKey = Signer.ed25519PublicKey(signerKeypair)
-
-  return SetOptionsOperation.Builder().setSigner(signerKey, signer.weight).build()
-}
-
-// TODO: build transaction with multiple operations
-suspend fun createTransactionBuilder(
-  sourceAddress: String,
-  server: Server,
-  network: Network,
-): TransactionBuilder {
-  val sourceAccount = fetchAccount(sourceAddress, server)
-
-  // TODO: add memo
-  // TODO: update max fee
-  // TODO: add time bounds
-  // TODO: custom base fee
-
-  return Transaction.Builder(sourceAccount, network).setBaseFee(500).setTimeout(180)
-}
-
-fun setThresholdsOperation(low: Int, medium: Int, high: Int): SetOptionsOperation {
-  return SetOptionsOperation.Builder()
-    .setLowThreshold(low)
-    .setMediumThreshold(medium)
-    .setHighThreshold(high)
-    .build()
-}
-
-fun setMasterKeyWeight(weight: Int): SetOptionsOperation {
-  return SetOptionsOperation.Builder().setMasterKeyWeight(weight).build()
-}
-
-fun lockMasterKey(): SetOptionsOperation {
-  return setMasterKeyWeight(0)
+  Log.d(logTagCreateAccount, "Threshold:")
+  Log.d(logTagCreateAccount, "  low: ${recoverableWallet.threshold.low}")
+  Log.d(logTagCreateAccount, "  medium: ${recoverableWallet.threshold.medium}")
+  Log.d(logTagCreateAccount, "  high: ${recoverableWallet.threshold.high}")
 }
