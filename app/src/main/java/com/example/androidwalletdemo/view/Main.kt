@@ -9,14 +9,19 @@ import com.example.androidwalletdemo.component.PageLayout
 @Composable
 fun Main(navController: NavHostController) {
   PageLayout("Stellar Wallet SDK Demo", navController) {
-    ActionButton(
-      label = "Create account",
-      onClick = { navController.navigate(NavRoutes.CreateAccount.route) }
-    )
+    //    ActionButton(
+    //      label = "Create account",
+    //      onClick = { navController.navigate(NavRoutes.CreateAccount.route) }
+    //    )
+
+    //    ActionButton(
+    //      label = "Recover account",
+    //      onClick = { navController.navigate(NavRoutes.RecoverAccount.route) }
+    //    )
 
     ActionButton(
-      label = "Recover account",
-      onClick = { navController.navigate(NavRoutes.RecoverAccount.route) }
+      label = "Interactive flow",
+      onClick = { navController.navigate(NavRoutes.InteractiveFlow.route) }
     )
   }
 }
