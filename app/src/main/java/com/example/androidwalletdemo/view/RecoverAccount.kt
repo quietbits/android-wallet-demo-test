@@ -16,16 +16,13 @@ import androidx.compose.material.Text
 import androidx.compose.material.TextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.graphics.toColorInt
 import androidx.navigation.NavHostController
 import com.example.androidwalletdemo.*
 import com.example.androidwalletdemo.component.PageLayout
+import com.example.androidwalletdemo.component.SuccessMessage
 import com.example.androidwalletdemo.component.TextWithLabel
 import com.example.androidwalletdemo.util.fetchStellarAddress
 import com.example.androidwalletdemo.util.shortenString
@@ -34,20 +31,14 @@ import org.stellar.sdk.*
 import org.stellar.walletsdk.RecoveryServerAuth
 import org.stellar.walletsdk.Wallet
 
-const val logTag = ">>> RecoverAccount"
-
-const val horizonUrl = "https://horizon-testnet.stellar.org"
-const val networkPassphrase = "Test SDF Network ; September 2015"
-
-const val recoveryServer1Name = "recoveryServer1"
-const val recoveryServer2Name = "recoveryServer2"
-
 fun base64Decoder(baseString: String): ByteArray {
   return Base64.decode(baseString, Base64.DEFAULT)
 }
 
 @Composable
 fun RecoverAccount(navController: NavHostController) {
+  val logTag = ">>> RecoverAccount"
+
   val context = LocalContext.current
   val screenScope = rememberCoroutineScope()
 
@@ -120,7 +111,7 @@ fun RecoverAccount(navController: NavHostController) {
     // =============================================================================================
 
     // Init wallet
-    val wallet = Wallet(horizonUrl, networkPassphrase)
+    val wallet = Wallet(horizonUrl, networkPassphrase, baseFee)
 
     if (txn == null && accountStellarAddress.isNotBlank()) {
       Log.d(logTag, "accountStellarAddress: $accountStellarAddress")
@@ -253,13 +244,7 @@ fun RecoverAccount(navController: NavHostController) {
     }
 
     if (txnSuccess) {
-      Text(
-        "New device signer added",
-        color = Color("#8bbe1b".toColorInt()),
-        fontSize = 20.sp,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth().padding(0.dp, 8.dp)
-      )
+      SuccessMessage(message = "New device signer added")
     }
   }
 }
