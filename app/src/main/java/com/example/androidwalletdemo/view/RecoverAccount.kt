@@ -59,7 +59,7 @@ fun RecoverAccount(navController: NavHostController) {
 
     val (txn, setTxn) = remember { mutableStateOf<Transaction?>(null) }
 
-    val userPhoneNumberState = remember { mutableStateOf(TextFieldValue(defaultPhoneNumber)) }
+    val userPhoneNumberState = remember { mutableStateOf(TextFieldValue(defaultPhoneNumberRecover)) }
     val userSmsCodeState = remember { mutableStateOf(TextFieldValue(defaultSmsCode)) }
 
     // =============================================================================================

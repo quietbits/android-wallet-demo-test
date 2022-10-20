@@ -76,69 +76,54 @@ fun CreateAccount(navController: NavHostController) {
 
       LaunchedEffect(true) {
         screenScope.launch {
-
-          // =====================================================================================
-          // WALLET SDK: CREATE RECOVERABLE WALLET
-          // =====================================================================================
-
-          // Account and device transaction signers
-          val accountWalletSigner = AppWalletSigner(accountSecretKey)
-          val deviceWalletSigner = AppWalletSigner(deviceSecretKey)
-
-          // Register account with recovery servers (can be done for account that does not exist
-          // on the network yet)
-          val enrolledRecoverySigners =
-            wallet.enrollWithRecoveryServer(
-              recoveryServers = listOf(recoveryServer1, recoveryServer2),
-              accountAddress = accountPublicKey,
-              accountIdentity =
-                listOf(
-                  RecoveryAccountIdentity(
-                    // Role can be "owner", "sender", or "receiver"
-                    role = "owner",
-                    auth_methods =
-                      // Account auth methods (phone number, email, etc)
-                      listOf(
-                        RecoveryAccountAuthMethod(
-                          type = "phone_number",
-                          value = userPhoneNumberState.value.text
-                        )
-                      )
-                  )
-                ),
-              walletSigner = accountWalletSigner
-            )
-
-          // Creating a list of signers to add to the account
-          val recoveryServerSigners =
-            enrolledRecoverySigners
-              .map { rs -> AccountSigner(address = rs, weight = signerRecoveryWeight) }
-              .toTypedArray()
-
-          val signer =
-            listOf(
-              *recoveryServerSigners,
-              AccountSigner(address = devicePublicKey, weight = signerMasterWeight)
-            )
-
-          // Fund account with friendbot (only on testnet) or sponsor creation of the account
+          // Fund account with friendbot (only on testnet) or sponsor create account operation
           val isFunded = fundWithFriendbot(accountPublicKey)
 
           if (isFunded) {
             Log.d(logTagCreateAccount, "Friendbot funded account")
 
-            // Create transaction to add new signers and thresholds to the account
+            // =====================================================================================
+            // WALLET SDK: CREATE RECOVERABLE WALLET
+            // =====================================================================================
+
+            // Account and device transaction signers
+            val accountWalletSigner = AppWalletSigner(accountSecretKey)
+            val deviceWalletSigner = AppWalletSigner(deviceSecretKey)
+
             // This transaction can be sponsored
             val newWalletTransaction =
-              wallet.registerRecoveryServerSigners(
+              wallet.createRecoverableWallet(
                 accountAddress = accountPublicKey,
-                accountSigner = signer,
+                deviceAddress = devicePublicKey,
+                // Account thresholds
                 accountThreshold =
                   AccountThreshold(
                     low = signerMasterWeight,
                     medium = signerMasterWeight,
                     high = signerMasterWeight
                   ),
+                accountIdentity =
+                  // Account identity (can be multiple) to be registered with recovery server
+                  listOf(
+                    RecoveryAccountIdentity(
+                      // Role can be "owner", "sender", or "receiver"
+                      role = "owner",
+                      auth_methods =
+                        // Account auth methods (phone number, email, etc)
+                        listOf(
+                          RecoveryAccountAuthMethod(
+                            type = "phone_number",
+                            value = userPhoneNumberState.value.text
+                          )
+                        )
+                    )
+                  ),
+                // Recovery server information
+                recoveryServers = listOf(recoveryServer1, recoveryServer2),
+                accountWalletSigner = accountWalletSigner,
+                // Account signer weights
+                signerWeight =
+                  SignerWeight(master = signerMasterWeight, recoveryServer = signerRecoveryWeight)
               )
 
             // Sign transaction with account master key
@@ -170,53 +155,53 @@ fun CreateAccount(navController: NavHostController) {
                 Log.d(logTagCreateAccount, "Master key locked")
               }
             }
+
+            // =====================================================================================
+            // DATA FOR LOGS AND UI
+            // =====================================================================================
+
+            val resultData =
+              RecoverableWallet(
+                address = accountPublicKey,
+                threshold =
+                  AccountThreshold(
+                    low = signerMasterWeight,
+                    medium = signerMasterWeight,
+                    high = signerMasterWeight
+                  ),
+                signer =
+                  listOf(
+                    AccountSigner(address = devicePublicKey, weight = signerMasterWeight),
+                    AccountSigner(
+                      address = recoveryServer1.stellarAddress,
+                      weight = signerRecoveryWeight
+                    ),
+                    AccountSigner(
+                      address = recoveryServer2.stellarAddress,
+                      weight = signerRecoveryWeight
+                    )
+                  ),
+                identity =
+                  listOf(
+                    RecoveryAccountIdentity(
+                      role = "owner",
+                      auth_methods =
+                        listOf(
+                          RecoveryAccountAuthMethod(
+                            type = "phone_number",
+                            value = userPhoneNumberState.value.text
+                          )
+                        )
+                    )
+                  )
+              )
+
+            logResult(resultData)
+            setRecoverableWallet(resultData)
+            setInProgress(false)
           } else {
             throw Exception("Account was not funded")
           }
-
-          // =====================================================================================
-          // DATA FOR LOGS AND UI
-          // =====================================================================================
-
-          val resultData =
-            RecoverableWallet(
-              address = accountPublicKey,
-              threshold =
-                AccountThreshold(
-                  low = signerMasterWeight,
-                  medium = signerMasterWeight,
-                  high = signerMasterWeight
-                ),
-              signer =
-                listOf(
-                  AccountSigner(address = devicePublicKey, weight = signerMasterWeight),
-                  AccountSigner(
-                    address = recoveryServer1.stellarAddress,
-                    weight = signerRecoveryWeight
-                  ),
-                  AccountSigner(
-                    address = recoveryServer2.stellarAddress,
-                    weight = signerRecoveryWeight
-                  )
-                ),
-              identity =
-                listOf(
-                  RecoveryAccountIdentity(
-                    role = "owner",
-                    auth_methods =
-                      listOf(
-                        RecoveryAccountAuthMethod(
-                          type = "phone_number",
-                          value = userPhoneNumberState.value.text
-                        )
-                      )
-                  )
-                )
-            )
-
-          logResult(resultData)
-          setRecoverableWallet(resultData)
-          setInProgress(false)
         }
       }
     }
