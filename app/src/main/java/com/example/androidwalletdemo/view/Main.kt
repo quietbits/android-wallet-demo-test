@@ -18,5 +18,10 @@ fun Main(navController: NavHostController) {
       label = "Recover account",
       onClick = { navController.navigate(NavRoutes.RecoverAccount.route) }
     )
+
+    ActionButton(
+      label = "Interactive flow",
+      onClick = { navController.navigate(NavRoutes.InteractiveFlow.route) }
+    )
   }
 }

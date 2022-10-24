@@ -17,9 +17,16 @@ import androidx.navigation.NavHostController
 fun PageLayout(
   pageTitle: String,
   navController: NavHostController,
-  content: @Composable() () -> Unit
+  noPadding: Boolean? = false,
+  content: @Composable() () -> Unit,
 ) {
   val scaffoldState = rememberScaffoldState()
+  val contentPadding =
+    if (noPadding == true) {
+      0.dp
+    } else {
+      8.dp
+    }
 
   MaterialTheme {
     Scaffold(
@@ -40,7 +47,9 @@ fun PageLayout(
       content = {
         Column(
           modifier =
-            Modifier.fillMaxSize().padding(all = 8.dp).verticalScroll(rememberScrollState())
+            Modifier.fillMaxSize()
+              .padding(all = contentPadding)
+              .verticalScroll(rememberScrollState())
         ) {
           content()
         }
