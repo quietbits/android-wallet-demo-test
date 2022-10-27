@@ -40,7 +40,7 @@ fun InteractiveFlow(navController: NavHostController) {
     // production with real accounts. Handle signing properly using KeyStore.
     val (userSecretKey, setUserSecretKey) = remember { mutableStateOf(sep24UserAccountSecret) }
     val (assetCode, setAssetCode) = remember { mutableStateOf(sep24AssetCode) }
-    val (assetIssuer, setAssetIssuer) = remember { mutableStateOf(sep24AssetIssuer) }
+    val (homeDomain, setHomeDomain) = remember { mutableStateOf(sep24HomeDomain) }
     val (inProgress, setInProgress) = remember { mutableStateOf(false) }
     val (webUrl, setWebUrl) = remember { mutableStateOf("") }
 
@@ -69,7 +69,7 @@ fun InteractiveFlow(navController: NavHostController) {
                 .getInteractiveDeposit(
                   accountAddress = userStellarAddress,
                   assetCode = assetCode,
-                  assetIssuer = assetIssuer,
+                  homeDomain = homeDomain,
                   walletSigner = AppWalletSigner(userSecretKey)
                 )
                 .url
@@ -79,7 +79,7 @@ fun InteractiveFlow(navController: NavHostController) {
                 .getInteractiveWithdrawal(
                   accountAddress = userStellarAddress,
                   assetCode = assetCode,
-                  assetIssuer = assetIssuer,
+                  homeDomain = homeDomain,
                   walletSigner = AppWalletSigner(userSecretKey)
                 )
                 .url
@@ -121,9 +121,9 @@ fun InteractiveFlow(navController: NavHostController) {
       modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
     )
     TextField(
-      value = assetIssuer,
-      onValueChange = { setAssetIssuer(it) },
-      label = { Text(text = "Asset issuer") },
+      value = homeDomain,
+      onValueChange = { setHomeDomain(it) },
+      label = { Text(text = "Anchor home domain") },
       modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
     )
 
