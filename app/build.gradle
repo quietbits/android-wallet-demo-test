@@ -73,6 +73,6 @@ dependencies {
     // TODO: make sure Wallet SDK won't require manually importing Java Stellar SDK
     implementation 'com.github.stellar:java-stellar-sdk:0.34.2'
 
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
-    implementation files('libs/WalletSDK-1.0-SNAPSHOT.jar')
+    // Using MavenLocal
+    implementation 'org.stellar:wallet-sdk:0.1.0'
 }

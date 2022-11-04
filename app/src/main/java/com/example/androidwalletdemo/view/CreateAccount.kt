@@ -20,6 +20,7 @@ import com.example.androidwalletdemo.component.TextWithLabel
 import com.example.androidwalletdemo.util.fundWithFriendbot
 import com.example.androidwalletdemo.util.shortenString
 import kotlinx.coroutines.launch
+import org.stellar.sdk.Server
 import org.stellar.walletsdk.*
 
 const val logTagCreateAccount = ">>> CreateAccount"
