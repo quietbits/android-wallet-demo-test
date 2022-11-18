@@ -15,3 +15,4 @@ const val sep24UserAccountSecret = "SAICIEF6C7ENEPUCFYU5YE7CF6Z2BXUCYQ4MNB3RK3MM
 const val sep24AssetCode = "SRT"
 const val sep24AssetIssuer = "GCDNJUBQSX7AJWLJACMJ7I4BC3Z47BQUTMHEICZLE6MU4KQBRYG5JY6B"
 const val sep24HomeDomain = "testanchor.stellar.org"
+const val sep24WebAuthEndpoint = "https://testanchor.stellar.org/auth"
