@@ -19,7 +19,10 @@ import com.example.androidwalletdemo.component.TextListWithLabel
 import com.example.androidwalletdemo.component.TextWithLabel
 import com.example.androidwalletdemo.util.fundWithFriendbot
 import com.example.androidwalletdemo.util.shortenString
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.stellar.sdk.Network
 import org.stellar.sdk.Server
 import org.stellar.walletsdk.*
 
@@ -34,7 +37,7 @@ data class RecoverableWallet(
 
 @Composable
 fun CreateAccount(navController: NavHostController) {
-  val screenScope = rememberCoroutineScope()
+  val screenScope = CoroutineScope(Dispatchers.IO)
 
   PageLayout("Create account", navController) {
     // =============================================================================================
@@ -55,7 +58,9 @@ fun CreateAccount(navController: NavHostController) {
     // =============================================================================================
 
     // Init wallet
-    val wallet = Wallet(horizonUrl, networkPassphrase, baseFee)
+    val server = Server(horizonUrl)
+    val network = Network(networkPassphrase)
+    val wallet = Wallet(server, network, baseFee)
 
     if (inProgress) {
       // Generate new account keypair

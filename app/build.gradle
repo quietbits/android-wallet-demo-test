@@ -70,9 +70,6 @@ dependencies {
     implementation 'com.squareup.okhttp3:okhttp:4.10.0'
     implementation 'com.google.code.gson:gson:2.9.0'
 
-    // TODO: make sure Wallet SDK won't require manually importing Java Stellar SDK
-    implementation 'com.github.stellar:java-stellar-sdk:0.34.2'
-
     // Using MavenLocal
     implementation 'org.stellar:wallet-sdk:0.1.0'
 }

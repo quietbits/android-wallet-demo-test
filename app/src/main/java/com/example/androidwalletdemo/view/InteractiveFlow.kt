@@ -18,6 +18,8 @@ import com.example.androidwalletdemo.*
 import com.example.androidwalletdemo.component.PageLayout
 import com.example.androidwalletdemo.util.OkHttpUtil
 import com.example.androidwalletdemo.util.UnsafeWebViewClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.stellar.sdk.Network
 import org.stellar.sdk.Server
@@ -25,7 +27,7 @@ import org.stellar.walletsdk.Anchor
 
 @Composable
 fun InteractiveFlow(navController: NavHostController) {
-  val screenScope = rememberCoroutineScope()
+  val screenScope = CoroutineScope(Dispatchers.IO)
   val pageContext = LocalContext.current
 
   PageLayout("Interactive deposit and withdrawal", navController) {
@@ -56,12 +58,20 @@ fun InteractiveFlow(navController: NavHostController) {
     val server = Server(horizonUrl)
     val network = Network(networkPassphrase)
     val httpClient = OkHttpUtil.unsafeOkhttpClient()
-    val anchor = Anchor(server, network, httpClient)
+    val anchor = Anchor(server, network, homeDomain, httpClient)
 
     if (inProgress && flowType.isNotEmpty()) {
       LaunchedEffect(true) {
         screenScope.launch {
           var flowUrl = ""
+          val toml = anchor.getInfo()
+
+          val authToken =
+            anchor.getAuthToken(
+              accountAddress = userStellarAddress,
+              toml = toml,
+              walletSigner = AppWalletSigner(userSecretKey)
+            )
 
           if (flowType == "deposit") {
             flowUrl =
@@ -69,8 +79,7 @@ fun InteractiveFlow(navController: NavHostController) {
                 .getInteractiveDeposit(
                   accountAddress = userStellarAddress,
                   assetCode = assetCode,
-                  homeDomain = homeDomain,
-                  walletSigner = AppWalletSigner(userSecretKey)
+                  authToken = authToken
                 )
                 .url
           } else {
@@ -79,8 +88,7 @@ fun InteractiveFlow(navController: NavHostController) {
                 .getInteractiveWithdrawal(
                   accountAddress = userStellarAddress,
                   assetCode = assetCode,
-                  homeDomain = homeDomain,
-                  walletSigner = AppWalletSigner(userSecretKey)
+                  authToken = authToken
                 )
                 .url
           }

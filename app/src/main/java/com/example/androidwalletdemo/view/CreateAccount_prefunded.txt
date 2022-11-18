@@ -33,7 +33,7 @@ data class RecoverableWallet(
 
 @Composable
 fun CreateAccount(navController: NavHostController) {
-  val screenScope = rememberCoroutineScope()
+  val screenScope = CoroutineScope(Dispatchers.IO)
 
   PageLayout("Create account", navController) {
     // =============================================================================================

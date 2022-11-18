@@ -26,6 +26,8 @@ import com.example.androidwalletdemo.component.SuccessMessage
 import com.example.androidwalletdemo.component.TextWithLabel
 import com.example.androidwalletdemo.util.fetchStellarAddress
 import com.example.androidwalletdemo.util.shortenString
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.stellar.sdk.*
 import org.stellar.walletsdk.RecoveryServerAuth
@@ -40,7 +42,7 @@ fun RecoverAccount(navController: NavHostController) {
   val logTag = ">>> RecoverAccount"
 
   val context = LocalContext.current
-  val screenScope = rememberCoroutineScope()
+  val screenScope = CoroutineScope(Dispatchers.IO)
 
   PageLayout("Recover account", navController) {
     // =============================================================================================
@@ -111,7 +113,9 @@ fun RecoverAccount(navController: NavHostController) {
     // =============================================================================================
 
     // Init wallet
-    val wallet = Wallet(horizonUrl, networkPassphrase, baseFee)
+    val server = Server(horizonUrl)
+    val network = Network(networkPassphrase)
+    val wallet = Wallet(server, network, baseFee)
 
     if (txn == null && accountStellarAddress.isNotBlank()) {
       Log.d(logTag, "accountStellarAddress: $accountStellarAddress")
