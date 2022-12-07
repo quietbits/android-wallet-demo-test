@@ -25,6 +25,9 @@ import kotlinx.coroutines.launch
 import org.stellar.sdk.Network
 import org.stellar.sdk.Server
 import org.stellar.walletsdk.*
+import org.stellar.walletsdk.recovery.Recovery
+import org.stellar.walletsdk.recovery.RecoveryAccountAuthMethod
+import org.stellar.walletsdk.recovery.RecoveryAccountIdentity
 
 const val logTagCreateAccount = ">>> CreateAccount"
 
@@ -61,17 +64,18 @@ fun CreateAccount(navController: NavHostController) {
     val server = Server(horizonUrl)
     val network = Network(networkPassphrase)
     val wallet = Wallet(server, network, baseFee)
+    val recovery = Recovery(server, network, baseFee)
 
     if (inProgress) {
       // Generate new account keypair
       val accountKeypair = wallet.create()
-      val accountPublicKey = accountKeypair.publicKey
+      val accountPublicKey = accountKeypair.address
       //  Secret key should be stored in KeyStore, saving on the UI for demo only
       val accountSecretKey = accountKeypair.secretKey
 
       // Generate new account keypair
       val deviceKeypair = wallet.create()
-      val devicePublicKey = deviceKeypair.publicKey
+      val devicePublicKey = deviceKeypair.address
       //  Secret key should be stored in KeyStore, saving on the UI for demo only
       val deviceSecretKey = deviceKeypair.secretKey
 
@@ -94,7 +98,7 @@ fun CreateAccount(navController: NavHostController) {
           // Register account with recovery servers (can be done for account that does not exist
           // on the network yet)
           val enrolledRecoverySigners =
-            wallet.enrollWithRecoveryServer(
+            recovery.enrollWithRecoveryServer(
               recoveryServers = listOf(recoveryServer1, recoveryServer2),
               accountAddress = accountPublicKey,
               accountIdentity =
@@ -136,7 +140,7 @@ fun CreateAccount(navController: NavHostController) {
             // Create transaction to add new signers and thresholds to the account
             // This transaction can be sponsored
             val newWalletTransaction =
-              wallet.registerRecoveryServerSigners(
+              recovery.registerRecoveryServerSigners(
                 accountAddress = accountPublicKey,
                 accountSigner = signer,
                 accountThreshold =

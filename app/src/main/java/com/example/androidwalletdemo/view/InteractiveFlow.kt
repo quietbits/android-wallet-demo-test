@@ -23,7 +23,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.stellar.sdk.Network
 import org.stellar.sdk.Server
-import org.stellar.walletsdk.Anchor
+import org.stellar.walletsdk.anchor.Anchor
+import org.stellar.walletsdk.anchor.Interactive
+import org.stellar.walletsdk.asset.IssuedAssetId
 
 @Composable
 fun InteractiveFlow(navController: NavHostController) {
@@ -42,6 +44,7 @@ fun InteractiveFlow(navController: NavHostController) {
     // production with real accounts. Handle signing properly using KeyStore.
     val (userSecretKey, setUserSecretKey) = remember { mutableStateOf(sep24UserAccountSecret) }
     val (assetCode, setAssetCode) = remember { mutableStateOf(sep24AssetCode) }
+    val (assetIssuer, setAssetIssuer) = remember { mutableStateOf(sep24AssetIssuer) }
     val (homeDomain, setHomeDomain) = remember { mutableStateOf(sep24HomeDomain) }
     val (inProgress, setInProgress) = remember { mutableStateOf(false) }
     val (webUrl, setWebUrl) = remember { mutableStateOf("") }
@@ -65,29 +68,26 @@ fun InteractiveFlow(navController: NavHostController) {
         screenScope.launch {
           var flowUrl = ""
           val toml = anchor.getInfo()
-
-          val authToken =
-            anchor.getAuthToken(
-              accountAddress = userStellarAddress,
-              toml = toml,
-              walletSigner = AppWalletSigner(userSecretKey)
-            )
+          val anchorAuth = anchor.auth(toml, AppWalletSigner(userSecretKey))
+          val authToken = anchorAuth.authenticate(userStellarAddress)
+          val interactiveFlow = Interactive(homeDomain, anchor, server, httpClient)
+          val assetId = IssuedAssetId(assetCode, assetIssuer)
 
           if (flowType == "deposit") {
             flowUrl =
-              anchor
-                .getInteractiveDeposit(
+              interactiveFlow
+                .deposit(
                   accountAddress = userStellarAddress,
-                  assetCode = assetCode,
+                  assetId = assetId,
                   authToken = authToken
                 )
                 .url
           } else {
             flowUrl =
-              anchor
-                .getInteractiveWithdrawal(
+              interactiveFlow
+                .withdraw(
                   accountAddress = userStellarAddress,
-                  assetCode = assetCode,
+                  assetId = assetId,
                   authToken = authToken
                 )
                 .url
@@ -126,6 +126,12 @@ fun InteractiveFlow(navController: NavHostController) {
       value = assetCode,
       onValueChange = { setAssetCode(it) },
       label = { Text(text = "Asset code") },
+      modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+    )
+    TextField(
+      value = assetIssuer,
+      onValueChange = { setAssetIssuer(it) },
+      label = { Text(text = "Asset issuer") },
       modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
     )
     TextField(
