@@ -30,12 +30,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.stellar.sdk.*
-import org.stellar.walletsdk.RecoveryServerAuth
 import org.stellar.walletsdk.Wallet
-
-fun base64Decoder(baseString: String): ByteArray {
-  return Base64.decode(baseString, Base64.DEFAULT)
-}
+import org.stellar.walletsdk.recovery.Recovery
+import org.stellar.walletsdk.recovery.RecoveryServerAuth
+import org.stellar.walletsdk.util.GlobalConfig
 
 @Composable
 fun RecoverAccount(navController: NavHostController) {
@@ -61,7 +59,9 @@ fun RecoverAccount(navController: NavHostController) {
 
     val (txn, setTxn) = remember { mutableStateOf<Transaction?>(null) }
 
-    val userPhoneNumberState = remember { mutableStateOf(TextFieldValue(defaultPhoneNumberRecover)) }
+    val userPhoneNumberState = remember {
+      mutableStateOf(TextFieldValue(defaultPhoneNumberRecover))
+    }
     val userSmsCodeState = remember { mutableStateOf(TextFieldValue(defaultSmsCode)) }
 
     // =============================================================================================
@@ -116,13 +116,16 @@ fun RecoverAccount(navController: NavHostController) {
     val server = Server(horizonUrl)
     val network = Network(networkPassphrase)
     val wallet = Wallet(server, network, baseFee)
+    val recovery = Recovery(server, network, baseFee)
+
+    GlobalConfig.base64Decoder = { Base64.decode(it, Base64.DEFAULT) }
 
     if (txn == null && accountStellarAddress.isNotBlank()) {
       Log.d(logTag, "accountStellarAddress: $accountStellarAddress")
 
       // Generate new device keypair
       val deviceKeypair = wallet.create()
-      val devicePublicKey = deviceKeypair.publicKey
+      val devicePublicKey = deviceKeypair.address
 
       //  Secret key should be stored in KeyStore, saving on the UI for demo only
       val deviceSecretKey = deviceKeypair.secretKey
@@ -157,7 +160,7 @@ fun RecoverAccount(navController: NavHostController) {
       LaunchedEffect(true) {
         screenScope.launch {
           setTxn(
-            wallet.signWithRecoveryServers(
+            recovery.signWithRecoveryServers(
               transaction = txn,
               accountAddress = accountStellarAddress,
               recoveryServers =
@@ -173,8 +176,6 @@ fun RecoverAccount(navController: NavHostController) {
                     authToken = authToken2
                   )
                 ),
-              // Custom decoder is needed to support Android API 21. It's not needed for API 23+.
-              base64Decoder = ::base64Decoder
             )
           )
           setHasRecoverySignatures(true)

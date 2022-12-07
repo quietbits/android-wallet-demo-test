@@ -10,10 +10,9 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.stellar.walletsdk.util.GsonUtils
 
 object OkHttpUtil {
-  private val gson = GsonUtils.instance!!
+  private val gson = GsonUtil.instance!!
   private const val jsonContentType = "application/json; charset=utf-8"
   private val jsonContentMediaType = jsonContentType.toMediaType()
 
